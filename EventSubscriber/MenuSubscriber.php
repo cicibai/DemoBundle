@@ -56,7 +56,7 @@ class MenuSubscriber implements EventSubscriberInterface
 
         if ($auth->isGranted('demo')) {
             $menu->addChild(
-                new MenuItemModel('demo', 'Demo', 'demo', [], 'fas fa-snowman')
+                new MenuItemModel('budget', 'Budget', 'demo', [], 'fas fa-funnel-dollar')
             );
         }
     }

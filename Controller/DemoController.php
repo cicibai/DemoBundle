@@ -19,8 +19,12 @@ use Sensio\Bundle\FrameworkExtraBundle\Configuration\Security;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Annotation\Route;
 
+use App\Project\ProjectStatisticService;
+use App\Reporting\ProjectView\ProjectViewForm;
+use App\Reporting\ProjectView\ProjectViewQuery;
+
 /**
- * @Route(path="/admin/demo")
+ * @Route(path="/admin/budget")
  * @Security("is_granted('demo')")
  */
 final class DemoController extends AbstractController
@@ -46,27 +50,33 @@ final class DemoController extends AbstractController
      * @param Request $request
      * @return \Symfony\Component\HttpFoundation\Response
      */
-    public function indexAction(Request $request)
+    public function indexAction(Request $request, ProjectStatisticService $service)
     {
-        $entity = $this->repository->getDemoEntity();
+        $dateFactory = $this->getDateTimeFactory();
+        $user = $this->getUser();
 
-        $entity->increaseCounter();
-        $this->repository->saveDemoEntity($entity);
+        $query = new ProjectViewQuery($dateFactory->createDateTime(), $user);
+        $form = $this->createForm(ProjectViewForm::class, $query);
+        $form->submit($request->query->all(), false);
 
-        return $this->render('@Demo/index.html.twig', [
-            'entity' => $entity,
-            'configuration' => $this->configuration,
-        ]);
-    }
+        $projects = $service->findProjectsForView($query);
+        $entries = $service->getProjectView($user, $projects, $query->getToday());
 
-    /**
-     * @param DemoEntity $entity
-     * @return \Symfony\Component\Form\FormInterface
-     */
-    protected function getEditForm(DemoEntity $entity)
-    {
-        return $this->createForm(DemoType::class, $entity, [
-            'action' => $this->generateUrl('demo'),
+        $byCustomer = [];
+        foreach ($entries as $entry) {
+            $customer = $entry->getProject()->getCustomer();
+            if (!isset($byCustomer[$customer->getId()])) {
+                $byCustomer[$customer->getId()] = ['customer' => $customer, 'projects' => []];
+            }
+            $byCustomer[$customer->getId()]['projects'][] = $entry;
+        }
+
+        return $this->render('@Demo/budget_view.html.twig', [
+            'entries' => $byCustomer,
+            'form' => $form->createView(),
+            'title' => 'report_project_view',
+            'tableName' => 'project_view_reporting',
+            'now' => $this->getDateTimeFactory()->createDateTime(),
         ]);
     }
 }
